@@ -108,3 +108,23 @@ func (h *Handler) Delete(c *gin.Context) {
 
 	c.Status(204)
 }
+
+func (h *Handler) Stats(c *gin.Context) {
+	projectID := c.Param("id")
+	userID := utils.GetUserID(c)
+
+	statusCounts, assigneeCounts, err := h.Service.GetStats(projectID, userID)
+	if err != nil {
+		if err.Error() == "forbidden" {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		c.JSON(404, gin.H{"error": "not found"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"by_status":   statusCounts,
+		"by_assignee": assigneeCounts,
+	})
+}
