@@ -41,6 +41,9 @@ func main() {
 
 	protected.GET("/projects", projectHandler.List)
 	protected.POST("/projects", projectHandler.Create)
+	protected.GET("/projects/:id", projectHandler.GetByID)
+	protected.PATCH("/projects/:id", projectHandler.Update)
+	protected.DELETE("/projects/:id", projectHandler.Delete)
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
