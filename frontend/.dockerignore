@@ -1,0 +1,37 @@
+# Dependencies (re-installed inside Docker)
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js build output (rebuilt inside Docker)
+.next
+out
+
+# Development / local env files
+.env*.local
+.env.development
+
+# Version control
+.git
+.gitignore
+
+# Editor config
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Tests & CI
+coverage
+.nyc_output
+*.test.*
+*.spec.*
+
+# Docs
+README.md
+LICENSE
