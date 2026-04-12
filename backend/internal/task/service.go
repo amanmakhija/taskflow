@@ -21,7 +21,7 @@ func (s *Service) Create(projectID, userID, title, desc, priority string) (*Task
 	task := &Task{
 		ID:          uuid.NewString(),
 		Title:       title,
-		Description: desc,
+		Description: &desc,
 		Status:      "todo",
 		Priority:    priority,
 		ProjectID:   p.ID,
@@ -51,7 +51,7 @@ func (s *Service) Update(taskID string, updates Task) error {
 	if updates.Title != "" {
 		task.Title = updates.Title
 	}
-	if updates.Description != "" {
+	if updates.Description != nil && *updates.Description != "" {
 		task.Description = updates.Description
 	}
 	if updates.Status != "" {

@@ -43,8 +43,9 @@ func GetTasks(projectID, status, assignee string) ([]Task, error) {
 
 	for rows.Next() {
 		var t Task
+		var desc *string
 		err := rows.Scan(
-			&t.ID, &t.Title, &t.Description,
+			&t.ID, &t.Title, &desc,
 			&t.Status, &t.Priority,
 			&t.ProjectID, &t.AssigneeID,
 			&t.DueDate, &t.CreatedAt, &t.UpdatedAt,
@@ -52,6 +53,7 @@ func GetTasks(projectID, status, assignee string) ([]Task, error) {
 		if err != nil {
 			return nil, err
 		}
+		t.Description = desc
 		tasks = append(tasks, t)
 	}
 
@@ -67,8 +69,9 @@ func GetTaskByID(id string) (*Task, error) {
 	row := db.Pool.QueryRow(context.Background(), query, id)
 
 	var t Task
+	var desc *string
 	err := row.Scan(
-		&t.ID, &t.Title, &t.Description,
+		&t.ID, &t.Title, &desc,
 		&t.Status, &t.Priority,
 		&t.ProjectID, &t.AssigneeID,
 		&t.DueDate, &t.CreatedAt, &t.UpdatedAt,
@@ -78,6 +81,7 @@ func GetTaskByID(id string) (*Task, error) {
 		return nil, err
 	}
 
+	t.Description = desc
 	return &t, nil
 }
 
