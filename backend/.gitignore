@@ -1,0 +1,36 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+main
+
+# Test binaries
+*.test
+
+# Output folders
+/bin/
+/build/
+
+# Go workspace
+go.work
+
+# Dependency directories (rare but safe)
+vendor/
+
+# Logs
+*.log
+
+# Environment files
+.env
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
