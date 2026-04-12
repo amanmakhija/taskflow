@@ -90,8 +90,8 @@ This project demonstrates a complete full-stack architecture with authentication
 ### Steps
 
 ```bash
-git clone https://github.com/your-username/taskflow-aman
-cd taskflow-aman
+git clone https://github.com/amanmakhjia/taskflow
+cd taskflow
 
 # create env files
 cp backend/.env.example backend/.env
