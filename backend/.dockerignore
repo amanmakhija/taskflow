@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+
+# Node (if any)
+node_modules/
+
+# Build artifacts
+bin/
+build/
+dist/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Env files (IMPORTANT)
+.env
+
+# Docker files (optional but clean)
+Dockerfile
+docker-compose.yml
+
+# Go cache (optional)
+go.sum

@@ -11,6 +11,7 @@ out
 # Development / local env files
 .env*.local
 .env.development
+.env.example
 
 # Version control
 .git
