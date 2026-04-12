@@ -65,3 +65,17 @@ func (s *Service) Delete(projectID, userID string) error {
 
 	return DeleteProject(projectID)
 }
+
+func (s *Service) GetStats(projectID, userID string) (map[string]int, map[string]int, error) {
+	project, err := GetProjectByID(projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// optional auth check (good practice)
+	if project.OwnerID != userID {
+		return nil, nil, errors.New("forbidden")
+	}
+
+	return GetProjectStats(projectID)
+}
