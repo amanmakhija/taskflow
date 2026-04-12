@@ -40,6 +40,7 @@ func main() {
 	protected.GET("/projects/:id", projectHandler.GetByID)
 	protected.PATCH("/projects/:id", projectHandler.Update)
 	protected.DELETE("/projects/:id", projectHandler.Delete)
+	protected.GET("/projects/:id/stats", projectHandler.Stats)
 
 	protected.GET("/projects/:id/tasks", taskHandler.List)
 	protected.POST("/projects/:id/tasks", taskHandler.Create)
