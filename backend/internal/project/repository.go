@@ -2,7 +2,11 @@ package project
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"taskflow/internal/db"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func CreateProject(p *Project) error {
@@ -59,6 +63,11 @@ func GetProjectByID(id string) (*Project, error) {
 
 	var p Project
 	err := row.Scan(&p.ID, &p.Name, &p.Description, &p.OwnerID, &p.CreatedAt)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -97,14 +106,17 @@ func GetProjectWithTasks(projectID string) (*Project, []map[string]interface{}, 
 	}
 
 	query := `
-	SELECT id, title, status, priority, assignee_id, due_date
-	FROM tasks WHERE project_id = $1
+	SELECT t.id, t.title, t.status, t.priority, t.assignee_id, t.due_date, u.name
+	FROM tasks t LEFT JOIN users u ON t.assignee_id = u.id
+	WHERE t.project_id = $1
 	`
 
 	rows, err := db.Pool.Query(context.Background(), query, projectID)
+
 	if err != nil {
 		return nil, nil, err
 	}
+
 	defer rows.Close()
 
 	var tasks []map[string]interface{}
@@ -112,22 +124,37 @@ func GetProjectWithTasks(projectID string) (*Project, []map[string]interface{}, 
 	for rows.Next() {
 		var (
 			id, title, status, priority string
-			assigneeID                  *string
-			dueDate                     *string
+			assigneeID                  sql.NullString
+			dueDate                     sql.NullTime
+			assigneeName                sql.NullString
 		)
 
-		err := rows.Scan(&id, &title, &status, &priority, &assigneeID, &dueDate)
+		err := rows.Scan(&id, &title, &status, &priority, &assigneeID, &dueDate, &assigneeName)
 		if err != nil {
 			return nil, nil, err
 		}
 
+		var assignee *string
+		var name string
+		if assigneeID.Valid {
+			assignee = &assigneeID.String
+			name = assigneeName.String
+		}
+
+		var due *string
+		if dueDate.Valid {
+			formatted := dueDate.Time.Format("2006-01-02")
+			due = &formatted
+		}
+
 		tasks = append(tasks, map[string]interface{}{
-			"id":          id,
-			"title":       title,
-			"status":      status,
-			"priority":    priority,
-			"assignee_id": assigneeID,
-			"due_date":    dueDate,
+			"id":            id,
+			"title":         title,
+			"status":        status,
+			"priority":      priority,
+			"assignee_id":   assignee,
+			"assignee_name": name,
+			"due_date":      due,
 		})
 	}
 

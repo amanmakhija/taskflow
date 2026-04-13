@@ -10,8 +10,8 @@ export interface AuthResponse {
   user: User;
 }
 
-export type TaskStatus = 'todo' | 'in_progress' | 'done';
-export type TaskPriority = 'low' | 'medium' | 'high';
+export type TaskStatus = "todo" | "in_progress" | "done";
+export type TaskPriority = "low" | "medium" | "high";
 
 export interface Task {
   id: string;
@@ -21,10 +21,10 @@ export interface Task {
   priority: TaskPriority;
   project_id: string;
   assignee_id?: string;
+  assignee_name?: string;
   due_date?: string;
   created_at: string;
   updated_at: string;
-  assignee?: User;
 }
 
 export interface Project {

@@ -35,6 +35,8 @@ func main() {
 	protected := r.Group("/")
 	protected.Use(authMiddleware)
 
+	protected.GET("/users", authHandler.GetUsers)
+
 	protected.GET("/projects", projectHandler.List)
 	protected.POST("/projects", projectHandler.Create)
 	protected.GET("/projects/:id", projectHandler.GetByID)

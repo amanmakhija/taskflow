@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -13,6 +13,7 @@ import {
 import { projectsApi, tasksApi } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -20,11 +21,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { TaskCard, STATUS_LABELS, STATUS_STYLES } from "@/components/TaskCard";
 import { TaskModal } from "@/components/TaskModal";
 import { StatsPanel } from "@/components/StatsPanel";
 import { toast } from "@/hooks/useToast";
-import { cn } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 import type { Task } from "@/types";
 
 const COLUMNS: { key: Task["status"]; color: string; dropColor: string }[] = [
@@ -45,6 +52,100 @@ const COLUMNS: { key: Task["status"]; color: string; dropColor: string }[] = [
   },
 ];
 
+// ── Edit Project Modal ───────────────────────────────────────────────────────
+function EditProjectModal({
+  open,
+  onClose,
+  currentName,
+  currentDescription,
+  onSave,
+  isPending,
+}: {
+  open: boolean;
+  onClose: () => void;
+  currentName: string;
+  currentDescription: string;
+  onSave: (name: string, description: string) => void;
+  isPending: boolean;
+}) {
+  const [name, setName] = useState(currentName);
+  const [desc, setDesc] = useState(currentDescription);
+  const [nameErr, setNameErr] = useState("");
+
+  // Sync when modal opens
+  useState(() => {
+    setName(currentName);
+    setDesc(currentDescription);
+  });
+
+  const handleOpen = (v: boolean) => {
+    if (v) {
+      setName(currentName);
+      setDesc(currentDescription);
+      setNameErr("");
+    } else onClose();
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setNameErr("Name is required");
+      return;
+    }
+    onSave(name.trim(), desc.trim());
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpen}>
+      <DialogContent className="sm:max-w-[440px]">
+        <DialogHeader>
+          <DialogTitle>Edit project</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4 mt-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-proj-name">Project name</Label>
+            <Input
+              id="edit-proj-name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameErr("");
+              }}
+              error={nameErr}
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-proj-desc">
+              Description{" "}
+              <span className="normal-case text-muted-foreground">
+                (optional)
+              </span>
+            </Label>
+            <textarea
+              id="edit-proj-desc"
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder="What's this project about?"
+              rows={3}
+              className="flex w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={isPending}>
+              Save changes
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Main Page ────────────────────────────────────────────────────────────────
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -52,10 +153,11 @@ export default function ProjectDetailPage() {
 
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
+  const [editProjectOpen, setEditProjectOpen] = useState(false);
+
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
-  const [editingName, setEditingName] = useState(false);
-  const [newName, setNewName] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [showStats, setShowStats] = useState(true);
 
   // Drag state
@@ -72,12 +174,19 @@ export default function ProjectDetailPage() {
     enabled: !!id,
   });
 
-  const { mutate: updateProject } = useMutation({
-    mutationFn: (name: string) => projectsApi.update(id!, { name }),
+  const { mutate: updateProject, isPending: updatingProject } = useMutation({
+    mutationFn: ({
+      name,
+      description,
+    }: {
+      name: string;
+      description: string;
+    }) =>
+      projectsApi.update(id!, { name, description: description || undefined }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["project", id] });
       qc.invalidateQueries({ queryKey: ["projects"] });
-      setEditingName(false);
+      setEditProjectOpen(false);
       toast({ title: "Project updated!" });
     },
     onError: () =>
@@ -106,7 +215,7 @@ export default function ProjectDetailPage() {
       });
       return { prev };
     },
-    onError: (_err, _vars, ctx: any) => {
+    onError: (_e, _v, ctx: any) => {
       if (ctx?.prev) qc.setQueryData(["project", id], ctx.prev);
       toast({ title: "Failed to move task", variant: "destructive" });
     },
@@ -124,28 +233,41 @@ export default function ProjectDetailPage() {
     setDraggingTask(null);
     setDragOverCol(null);
   }, []);
-
   const handleDrop = useCallback(
     (targetStatus: Task["status"]) => {
       if (!draggingTask) return;
-      if (draggingTask.status !== targetStatus) {
+      if (draggingTask.status !== targetStatus)
         moveTask({ taskId: draggingTask.id, status: targetStatus });
-      }
       setDraggingTask(null);
       setDragOverCol(null);
     },
     [draggingTask, moveTask],
   );
 
-  const startEdit = () => {
-    setNewName(project?.name || "");
-    setEditingName(true);
-  };
-
   const tasks = project?.tasks ?? [];
+
+  // Derive unique assignees from tasks for the filter dropdown
+  const assignees = useMemo(() => {
+    const map = new Map<string, string>(); // id → name
+    tasks.forEach((t) => {
+      if (t.assignee_id) {
+        const name = t.assignee_name ?? `User ${t.assignee_id.slice(0, 6)}`;
+        map.set(t.assignee_id, name);
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [tasks]);
+
   const filteredTasks = tasks.filter((t) => {
     if (statusFilter !== "all" && t.status !== statusFilter) return false;
     if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
+    if (assigneeFilter === "unassigned" && t.assignee_id) return false;
+    if (
+      assigneeFilter !== "all" &&
+      assigneeFilter !== "unassigned" &&
+      t.assignee_id !== assigneeFilter
+    )
+      return false;
     return true;
   });
 
@@ -153,6 +275,16 @@ export default function ProjectDetailPage() {
     todo: filteredTasks.filter((t) => t.status === "todo"),
     in_progress: filteredTasks.filter((t) => t.status === "in_progress"),
     done: filteredTasks.filter((t) => t.status === "done"),
+  };
+
+  const hasActiveFilters =
+    statusFilter !== "all" ||
+    priorityFilter !== "all" ||
+    assigneeFilter !== "all";
+  const clearFilters = () => {
+    setStatusFilter("all");
+    setPriorityFilter("all");
+    setAssigneeFilter("all");
   };
 
   if (isLoading) {
@@ -163,11 +295,6 @@ export default function ProjectDetailPage() {
         <div className="grid grid-cols-3 gap-3 mt-6">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />
-          ))}
-        </div>
-        <div className="space-y-3 mt-6">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-xl bg-muted animate-pulse" />
           ))}
         </div>
       </div>
@@ -203,48 +330,29 @@ export default function ProjectDetailPage() {
       {/* Project header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div className="min-w-0 flex-1">
-          {editingName ? (
-            <div className="flex items-center gap-2">
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="text-xl font-display font-bold h-auto py-1 px-2 max-w-sm"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") updateProject(newName);
-                  if (e.key === "Escape") setEditingName(false);
-                }}
-              />
-              <button
-                onClick={() => updateProject(newName)}
-                className="p-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                <Check className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setEditingName(false)}
-                className="p-1.5 rounded-md border hover:bg-muted"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 group">
-              <h1 className="font-display font-bold text-2xl tracking-tight truncate">
-                {project.name}
-              </h1>
-              <button
-                onClick={startEdit}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-muted-foreground hover:text-foreground"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-          {project.description && (
+          <div className="flex items-center gap-2 group">
+            <h1 className="font-display font-bold text-2xl tracking-tight truncate">
+              {project.name}
+            </h1>
+            <button
+              onClick={() => setEditProjectOpen(true)}
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+              title="Edit project"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          </div>
+          {project.description ? (
             <p className="text-sm text-muted-foreground mt-1">
               {project.description}
             </p>
+          ) : (
+            <button
+              onClick={() => setEditProjectOpen(true)}
+              className="text-xs text-muted-foreground/50 hover:text-muted-foreground mt-1 transition-colors italic"
+            >
+              + Add description
+            </button>
           )}
         </div>
 
@@ -280,13 +388,14 @@ export default function ProjectDetailPage() {
       )}
 
       {/* Filters */}
-      <div className="flex items-center gap-3 mb-5 flex-wrap">
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <SlidersHorizontal className="h-3.5 w-3.5" />
           <span>Filter:</span>
         </div>
+
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-8 w-36 text-xs">
+          <SelectTrigger className="h-8 w-32 text-xs">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -296,8 +405,9 @@ export default function ProjectDetailPage() {
             <SelectItem value="done">Done</SelectItem>
           </SelectContent>
         </Select>
+
         <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-          <SelectTrigger className="h-8 w-36 text-xs">
+          <SelectTrigger className="h-8 w-32 text-xs">
             <SelectValue placeholder="Priority" />
           </SelectTrigger>
           <SelectContent>
@@ -307,17 +417,39 @@ export default function ProjectDetailPage() {
             <SelectItem value="high">High</SelectItem>
           </SelectContent>
         </Select>
-        {(statusFilter !== "all" || priorityFilter !== "all") && (
+
+        {/* Assignee filter — only shown when tasks have assignees */}
+        {(assignees.length > 0 || assigneeFilter !== "all") && (
+          <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+            <SelectTrigger className="h-8 w-36 text-xs">
+              <SelectValue placeholder="Assignee" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All assignees</SelectItem>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
+              {assignees.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/15 text-primary text-[9px] font-bold">
+                      {getInitials(a.name)}
+                    </span>
+                    {a.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {hasActiveFilters && (
           <button
-            onClick={() => {
-              setStatusFilter("all");
-              setPriorityFilter("all");
-            }}
+            onClick={clearFilters}
             className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
           >
             <X className="h-3 w-3" /> Clear filters
           </button>
         )}
+
         <span className="ml-auto text-xs text-muted-foreground">
           {filteredTasks.length} of {tasks.length} tasks
         </span>
@@ -371,10 +503,8 @@ export default function ProjectDetailPage() {
                     setDragOverCol(key);
                 }}
                 onDragLeave={(e) => {
-                  // Only clear if leaving the column entirely (not entering a child)
-                  if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node))
                     setDragOverCol(null);
-                  }
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -398,11 +528,11 @@ export default function ProjectDetailPage() {
                   </span>
                 </div>
 
-                {/* Drop zone indicator when dragging over empty/other column */}
+                {/* Drop indicator */}
                 {isOver && canDrop && (
                   <div
                     className={cn(
-                      "mb-2 rounded-xl border-2 border-dashed py-3 text-center text-xs font-medium transition-all",
+                      "mb-2 rounded-xl border-2 border-dashed py-3 text-center text-xs font-medium",
                       key === "todo"
                         ? "border-slate-400 text-slate-500"
                         : key === "in_progress"
@@ -433,7 +563,7 @@ export default function ProjectDetailPage() {
                   {colTasks.length === 0 && !isOver && (
                     <div className="rounded-xl border border-dashed border-border py-6 text-center text-xs text-muted-foreground">
                       {draggingTask
-                        ? `Drop here`
+                        ? "Drop here"
                         : `No ${STATUS_LABELS[key].toLowerCase()} tasks`}
                     </div>
                   )}
@@ -444,6 +574,17 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
+      {/* Edit Project Modal */}
+      <EditProjectModal
+        open={editProjectOpen}
+        onClose={() => setEditProjectOpen(false)}
+        currentName={project.name}
+        currentDescription={project.description ?? ""}
+        onSave={(name, description) => updateProject({ name, description })}
+        isPending={updatingProject}
+      />
+
+      {/* Task Modal */}
       <TaskModal
         projectId={id!}
         task={editingTask}

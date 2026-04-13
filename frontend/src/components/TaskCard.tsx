@@ -5,12 +5,11 @@ import {
   Trash2,
   Calendar,
   AlertCircle,
-  User,
   GripVertical,
 } from "lucide-react";
 import { tasksApi } from "@/api";
 import { toast } from "@/hooks/useToast";
-import { cn, formatDate, isOverdue } from "@/lib/utils";
+import { cn, formatDate, isOverdue, getInitials } from "@/lib/utils";
 import type { Task } from "@/types";
 
 export const STATUS_STYLES: Record<Task["status"], string> = {
@@ -30,6 +29,18 @@ const PRIORITY_DOT: Record<Task["priority"], string> = {
   low: "bg-slate-400",
   medium: "bg-amber-400",
   high: "bg-rose-500",
+};
+
+const PRIORITY_LABEL: Record<Task["priority"], string> = {
+  low: "Low",
+  medium: "Med",
+  high: "High",
+};
+
+const PRIORITY_COLOR: Record<Task["priority"], string> = {
+  low: "text-muted-foreground",
+  medium: "text-amber-500",
+  high: "text-rose-500",
 };
 
 interface TaskCardProps {
@@ -68,7 +79,6 @@ export function TaskCard({
       draggable
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
-        // Small timeout so the ghost image renders before we apply opacity
         setTimeout(() => onDragStart(task), 0);
       }}
       onDragEnd={onDragEnd}
@@ -86,7 +96,8 @@ export function TaskCard({
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap mb-1">
+        {/* Status + priority badge row */}
+        <div className="flex items-center gap-2 flex-wrap mb-1.5">
           <span
             className={cn(
               "flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0",
@@ -101,7 +112,14 @@ export function TaskCard({
             />
             {STATUS_LABELS[task.status]}
           </span>
+          <span
+            className={cn("text-xs font-medium", PRIORITY_COLOR[task.priority])}
+          >
+            {PRIORITY_LABEL[task.priority]}
+          </span>
         </div>
+
+        {/* Title */}
         <p
           className={cn(
             "text-sm font-medium leading-snug",
@@ -110,12 +128,16 @@ export function TaskCard({
         >
           {task.title}
         </p>
+
+        {/* Description */}
         {task.description && (
           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
             {task.description}
           </p>
         )}
-        <div className="flex items-center gap-3 mt-2">
+
+        {/* Meta row */}
+        <div className="flex items-center gap-3 mt-2 flex-wrap">
           {task.due_date && (
             <span
               className={cn(
@@ -133,24 +155,25 @@ export function TaskCard({
               {formatDate(task.due_date)}
             </span>
           )}
-          {task.assignee_id && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <User className="h-3 w-3" />
-              Assigned
+
+          {/* Assignee avatar + name */}
+          {task.assignee_name ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/15 text-primary text-[9px] font-bold flex-shrink-0">
+                {getInitials(task.assignee_name)}
+              </span>
+              <span className="truncate max-w-[80px]">
+                {task.assignee_name}
+              </span>
             </span>
-          )}
-          <span
-            className={cn(
-              "text-xs capitalize font-medium",
-              task.priority === "high"
-                ? "text-rose-500"
-                : task.priority === "medium"
-                  ? "text-amber-500"
-                  : "text-muted-foreground",
-            )}
-          >
-            {task.priority}
-          </span>
+          ) : task.assignee_id ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-muted text-muted-foreground text-[9px] font-bold flex-shrink-0">
+                ?
+              </span>
+              <span>Assigned</span>
+            </span>
+          ) : null}
         </div>
       </div>
 

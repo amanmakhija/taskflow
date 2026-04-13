@@ -2,6 +2,7 @@ package task
 
 import (
 	"net/http"
+	"time"
 
 	"taskflow/pkg/utils"
 
@@ -54,13 +55,53 @@ func (h *Handler) List(c *gin.Context) {
 func (h *Handler) Update(c *gin.Context) {
 	id := c.Param("id")
 
-	var t Task
-	if err := c.ShouldBindJSON(&t); err != nil {
+	var req UpdateTaskRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": "validation failed"})
 		return
 	}
 
-	err := h.Service.Update(id, t)
+	// 🔥 convert to Task model
+	var task Task
+
+	if req.Title != nil {
+		task.Title = *req.Title
+	}
+	if req.Description != nil {
+		task.Description = req.Description
+	}
+	if req.Status != nil {
+		task.Status = *req.Status
+	}
+	if req.Priority != nil {
+		task.Priority = *req.Priority
+	}
+	if req.AssigneeID != nil {
+		task.AssigneeID = req.AssigneeID
+	}
+
+	if req.DueDate != nil {
+		parsed, err := time.Parse("2006-01-02", *req.DueDate)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "invalid date format (YYYY-MM-DD required)"})
+			return
+		}
+		task.DueDate = &parsed
+	}
+
+	if req.Status != nil {
+		valid := map[string]bool{
+			"todo":        true,
+			"in_progress": true,
+			"done":        true,
+		}
+		if !valid[*req.Status] {
+			c.JSON(400, gin.H{"error": "invalid status"})
+			return
+		}
+	}
+
+	err := h.Service.Update(id, task)
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return

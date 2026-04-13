@@ -31,8 +31,17 @@ func (s *Service) List(userID string) ([]Project, error) {
 	return GetProjectsByUser(userID)
 }
 
-func (s *Service) GetByID(projectID string) (*Project, []map[string]interface{}, error) {
-	return GetProjectWithTasks(projectID)
+func (s *Service) GetByID(projectID, userID string) (*Project, []map[string]interface{}, error) {
+	project, tasks, err := GetProjectWithTasks(projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if project.OwnerID != userID {
+		return nil, nil, errors.New("forbidden")
+	}
+
+	return project, tasks, nil
 }
 
 func (s *Service) Update(projectID, userID, name, description string) error {

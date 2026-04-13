@@ -48,9 +48,14 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) GetByID(c *gin.Context) {
 	id := c.Param("id")
+	userID := utils.GetUserID(c)
 
-	project, tasks, err := h.Service.GetByID(id)
+	project, tasks, err := h.Service.GetByID(id, userID)
 	if err != nil {
+		if err.Error() == "forbidden" {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
 		c.JSON(404, gin.H{"error": "not found"})
 		return
 	}
@@ -119,7 +124,7 @@ func (h *Handler) Stats(c *gin.Context) {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
-		c.JSON(404, gin.H{"error": "not found"})
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 

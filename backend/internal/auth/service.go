@@ -58,3 +58,7 @@ func (s *Service) Login(req LoginRequest) (*User, string, error) {
 
 	return user, token, nil
 }
+
+func (s *Service) GetUsers() ([]*User, error) {
+	return GetAllUsers()
+}

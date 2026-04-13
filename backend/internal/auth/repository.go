@@ -40,3 +40,32 @@ func GetUserByEmail(email string) (*User, error) {
 
 	return &user, nil
 }
+
+func GetAllUsers() ([]*User, error) {
+	query := `
+	SELECT id, name, email, created_at
+	FROM users
+	ORDER BY created_at DESC
+	`
+
+	rows, err := db.Pool.Query(context.Background(), query)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var users []*User
+
+	for rows.Next() {
+		var user User
+		err := rows.Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, &user)
+	}
+
+	return users, nil
+}

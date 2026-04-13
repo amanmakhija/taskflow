@@ -60,8 +60,12 @@ func (s *Service) Update(taskID string, updates Task) error {
 	if updates.Priority != "" {
 		task.Priority = updates.Priority
 	}
-	task.AssigneeID = updates.AssigneeID
-	task.DueDate = updates.DueDate
+	if updates.AssigneeID != nil {
+		task.AssigneeID = updates.AssigneeID
+	}
+	if updates.DueDate != nil {
+		task.DueDate = updates.DueDate
+	}
 
 	return UpdateTask(task)
 }
